@@ -2,17 +2,20 @@
 
 # Default values
 EXTENSIONS="cs,csproj,sln,json,xml,config,js,ts,html,css,scss,jsx,tsx,py,java,class,jar,properties,sh,bash,zsh,bat,cmd,gradle,groovy,kts,yaml,yml,ini,md,txt,sql,ps1,psm1,cshtml,vbhtml,razor,vb,fs,fsharp,dll,pdb,exe,asp,aspx,ashx,asax,asp,ascx,master,sitemap,resx,rdlc,wsdl,xsd,svc,edmx,rdl,rdlc,rptproj,vbproj,vb,csx,targets,props,nuspec,pkgdef,vsix,suo,user,tt,tmpl,t4,t4s,license,log,cache,db,migrations,csv,tsv,pdf,info"
-
 DEPTH=""
 MAX_DEPTH=""
 SHOW_HIDDEN="false"
 
+# Default exclude pattern
+EXCLUDE_PATTERN="bin|obj|.vscode|.vs|Migrations|.Designer.cs|.idea"
+
 # Display help message
 function show_help() {
-  echo "Usage: cattree [-e extensions] [-d depth] [-a]"
+  echo "Usage: cattree [-e extensions] [-d depth] [-a] [-x pattern]"
   echo "  -e, --extensions   Comma-separated list of file extensions to include (e.g., cs,json)"
   echo "  -d, --depth        Depth level for the tree output and file search (e.g., 2)"
   echo "  -a, --all          Include hidden directories and files (default is to exclude .vscode, .vs, bin, obj)"
+  echo "  -x                 Custom pattern to exclude directories/files (overrides the default)"
   echo "  -h, --help         Display this help message"
 }
 
@@ -32,6 +35,11 @@ while [[ $# -gt 0 ]]; do
       ;;
     -a|--all)
       SHOW_HIDDEN="true"
+      shift
+      ;;
+    -x)
+      EXCLUDE_PATTERN="$2"
+      shift
       shift
       ;;
     -h|--help)
@@ -55,15 +63,16 @@ for ext in "${EXT_ARRAY[@]}"; do
   EXT_PATTERN="$EXT_PATTERN -P '*.$ext'"
 done
 
-# Define directories to exclude if SHOW_HIDDEN is false
+# Handle exclusion of directories if SHOW_HIDDEN is false
 if [ "$SHOW_HIDDEN" = "false" ]; then
-  EXCLUDE_PATTERN="--prune -I 'bin|obj|.vscode|.vs'"
+  EXCLUDE_GREP="-E '$EXCLUDE_PATTERN'"
+  TREE_EXCLUDE="-I '$EXCLUDE_PATTERN'"
 else
-  EXCLUDE_PATTERN=""
+  EXCLUDE_GREP=""
+  TREE_EXCLUDE=""
 fi
 
 echo -e "\n\033[0;34mCatTreeing \033[0;36m${PWD}\033[0m..."
-
 
 # Properly format the find command to include all extensions and depth
 FIND_PATTERN=""
@@ -73,14 +82,13 @@ done
 FIND_PATTERN="${FIND_PATTERN% -o}"  # Remove trailing '-o'
 
 # Use find with the constructed pattern and depth
-eval "find . $MAX_DEPTH -type f \( $FIND_PATTERN \) | grep -Ev '.vscode|.vs|bin|obj' | while read file; do
+eval "find . $MAX_DEPTH -type f \( $FIND_PATTERN \) | grep -Ev $EXCLUDE_GREP | while read file; do
   echo -e \"\n\033[0;34m==================== \033[0;36m\$file \033[0;34m====================\033[0m\n\"
   cat \"\$file\"
   echo
 done"
 
-
 # Generate tree output with files filtered by extensions
 echo -e $'\n\033[0;34m==================== \033[0;36mCat Tree \033[0;34m====================\033[0m\n\n /\\_/\\\n( o.o )\n > ^ <\033[0;32m'
-eval "tree $DEPTH $EXT_PATTERN $EXCLUDE_PATTERN" | sed 's/^/   /'
+eval "tree $DEPTH $EXT_PATTERN $TREE_EXCLUDE" | sed 's/^/   /'
 echo -e '\n\033[0m'
